@@ -117,8 +117,6 @@ For production deployment, this service would use:
 **Considerations**
 - "The service should handle millions of orders and be scalable for global storefronts"
    - Horizontally scaling this service in AWS, as noted, is made quite easy with ECS and the usage of IAC. Proper metrics, alarms, etc would need to be tuned.
-- "Inter-service communication should be resilient to failures and scalable"
-   - Right now we're just publishing events to a message queue when a status of an order changes. If the message fails, we continue on our way, while of course logging the issue. Maybe we'd need to refine this and continue to try pumping the message out and/or have some kind of alert mechanism when there are service outages detected.
 
 ### Resilience
 
@@ -126,6 +124,10 @@ For production deployment, this service would use:
 - Circuit breakers for external service calls
 - Retry mechanisms with exponential backoff
 - Dead letter queues for failed message processing
+
+**Considerations**
+- "Inter-service communication should be resilient to failures and scalable"
+   - Right now we're just publishing events to a message queue when a status of an order changes. If the message fails, we continue on our way, while of course logging the issue. Maybe we'd need to refine this and continue to try pumping the message out and/or have some kind of alert mechanism when there are service outages detected.
 
 ### Security
 - The Order Management service should have authentication middleware to ensure only authenticated users can utilize these APIs. If internal services were communicating with the Order Management service, we could consider API keys.

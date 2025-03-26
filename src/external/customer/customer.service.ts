@@ -28,7 +28,7 @@ export class CustomerService {
     try {
       this.logger.log(`Fetching customer with ID: ${id}`);
       
-      // Check if we should use the real API or mock data, could be an env variable
+      // Check if we should use the real API or mock data
       const useRealApi = this.configService.get('USE_REAL_CUSTOMER_API', 'false') === 'true';
       
       if (useRealApi) {

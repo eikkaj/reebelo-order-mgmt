@@ -1,49 +1,57 @@
 # Order Management Microservice
 
-A NestJS TypeScript microservice designed to handle order management for multiple e-commerce storefronts, capable of scaling to handle millions of users and orders globally.
+NestJS in TS built for a basic order management system for Reebelo
 
 ## Project Overview
 
-This microservice handles all aspects of order management including:
-
-- Creating orders with products and quantities
-- Updating orders with shipping information
-- Updating order status (processing, shipped, delivered, cancelled)
-- Deleting orders
+Order Management Operations:
+   - Creating orders with products and quantities
+   - Updating orders with shipping information
+   - Updating order status (processing, shipped, delivered, cancelled)
+   - Deleting orders
 
 ## Architecture
-
-The service is built with NestJS and TypeScript, following a layered architecture:
 
 1. **Controllers**: Handle API requests and route them to services
 2. **Services**: Contain business logic and coordinate between repositories and external services
 3. **Repositories**: Handle data access abstraction
 4. **DTOs**: Define data transfer objects for structured data sharing between layers
-5. **Entities**: Define the domain models
+5. **Entities**: Define the domain models (right now, just: order, order status, order items)
+6. **Tests**: Some rudimentary tests with jest
 
 ## Core Features
 
 ### Order Management
 
 - Full CRUD operations for orders
-- Status management with validation of state transitions
+- Status management with *validation of state transitions*
 - Shipping information updates
 
 ### External Service Integration
 
-The service communicates with other microservices through:
+The order management service communicates with other microservices through:
 
 1. **Synchronous API Calls** - Using HTTP for immediate data needs:
-   - Customer Service: Fetches customer details during order creation
-   - Inventory Service: Manages product details and inventory levels
+   - Customer Service: Fetches customer details during order creation - I mocked a bunch of data here...
+   - Inventory Service: Manages product details and inventory levels - I mocked a bunch of data here too...
 
 2. **Asynchronous Messaging** - Using a message queue for event-driven communication:
    - Order events: Created, Updated, Shipped, Delivered, Canceled
    - Inventory events: Reserved, Released
+   - Message queue mocks a connection with RabbitMQ, so it isn't really doing anything atm
+
+### Logging Service
+   - Custom logging service extending NestJS LoggerService interface
+   - Winston is utilized for fancier log formatting 
+   - Configurable log levels
+   - LoggingInterceptor that logs all HTTP requests
+
+### Swagger
+   - Swagger UI available at [http://0.0.0.0:8000/api]
 
 ## Technical Implementation
 
-### API Endpoints
+### API Endpoints (or see swagger!)
 
 - `GET /orders` - List all orders with optional filtering
 - `GET /orders/:id` - Get order details
@@ -67,10 +75,11 @@ The service publishes the following events to the message queue:
 
 ### Resilience Features
 
-- Circuit breaking for external service calls
-- Retry mechanisms for failed operations
-- Graceful degradation when external services are unavailable
+- [not yet] Retry mechanisms for failed operations
+- [sort of] Graceful degradation when external services are unavailable
+   - We handle 404s when resources are not found, we handle for bad API requests in general, we have some configurability for utilizing mock data vs "real" data (although real data is not possible atm)
 - Comprehensive error handling and logging
+   - logs of logging
 
 ## Deployment Considerations
 
@@ -105,12 +114,23 @@ For production deployment, this service would use:
 - Read replicas for high-read workloads
 - Caching layers for frequently accessed data
 
+**Considerations**
+- "The service should handle millions of orders and be scalable for global storefronts"
+   - Horizontally scaling this service in AWS, as noted, is made quite easy with ECS and the usage of IAC. Proper metrics, alarms, etc would need to be tuned.
+- "Inter-service communication should be resilient to failures and scalable"
+   - Right now we're just publishing events to a message queue when a status of an order changes. If the message fails, we continue on our way, while of course logging the issue. Maybe we'd need to refine this and continue to try pumping the message out and/or have some kind of alert mechanism when there are service outages detected.
+
 ### Resilience
 
-- Multi-AZ deployment for high availability
+- I'd opt for multi-AZ deployment for high availability
 - Circuit breakers for external service calls
 - Retry mechanisms with exponential backoff
 - Dead letter queues for failed message processing
+
+### Security
+- The Order Management service should have authentication middleware to ensure only authenticated users can utilize these APIs. If internal services were communicating with the Order Management service, we could consider API keys.
+- AWS Secrets Manager is nice for API key storage, we could cache the key so that we don't get rate limited
+- API Gateway and ALBs can also be leveraged for API key validation, simplifying our Order Management Service
 
 ## Development Setup
 
@@ -125,8 +145,8 @@ For production deployment, this service would use:
 # Install dependencies
 npm install
 
-# Start development server
-npm run start:dev
+# Start server
+npm run start
 ```
 
 ### Environment Variables
@@ -150,3 +170,7 @@ npm run start:dev
 7. **Pagination**: Add pagination for list endpoints
 8. **WebSockets**: Add real-time order status updates via WebSockets
 9. **Reporting**: Add aggregation and reporting capabilities
+10. **Messaging Queue Improvements**: Retry, Exponential Backoff...
+11. **Code Quality**: I added eslint but this needs to be improved upon and actually utilized
+12. **CI/CD**: Automate build, tests, deployment of service with Github Actions or an equivalent
+13. **IAC**: Automate resource deployment to the cloud with Terraform or equivalent (I like Terraform)

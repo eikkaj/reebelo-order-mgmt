@@ -3,7 +3,6 @@ import { ConfigService } from '../config/config.service';
 import { Logger } from '../logger/logger.service';
 import * as amqplib from 'amqplib';
 
-// Define types for connection and channel
 interface AmqpConnection {
   close(): Promise<void>;
   createChannel(): Promise<AmqpChannel>;
@@ -21,7 +20,6 @@ interface AmqpChannel {
   nack(message: any, allUpTo?: boolean, requeue?: boolean): void;
 }
 
-// Define event types for the messaging system
 export enum QueueEvents {
   ORDER_CREATED = 'order.created',
   ORDER_UPDATED = 'order.updated',
@@ -32,6 +30,9 @@ export enum QueueEvents {
   INVENTORY_RELEASED = 'inventory.released',
 }
 
+/**
+ * MessagingService uses a mocked RabbitMQ connection
+ */
 @Injectable()
 export class MessagingService implements OnModuleInit, OnModuleDestroy {
   private connection: AmqpConnection;
@@ -39,6 +40,10 @@ export class MessagingService implements OnModuleInit, OnModuleDestroy {
   private readonly amqpUrl: string;
   private readonly exchangeName = 'order_exchange';
   private isConnected = false;
+
+  // TODO: Implement retry logic, exponential backoff, etc.
+  private readonly maxRetries = 3;
+  private readonly retryDelay = 1000;
   
   constructor(
     private readonly logger: Logger,
@@ -67,17 +72,9 @@ export class MessagingService implements OnModuleInit, OnModuleDestroy {
     }
   }
   
-  // Connect to RabbitMQ
   async connect(): Promise<void> {
     try {
       this.logger.log(`Connecting to message broker at ${this.amqpUrl}`);
-      
-      // In a real environment, we would connect to RabbitMQ:
-      // this.connection = await amqplib.connect(this.amqpUrl);
-      // this.channel = await this.connection.createChannel();
-      
-      // For demonstration/development purposes, we'll mock the connection
-      // This allows the service to run without an actual RabbitMQ instance
       const mockConnection = this.configService.get('USE_REAL_MESSAGE_BROKER', 'false') === 'true';
       
       if (mockConnection) {
@@ -85,11 +82,8 @@ export class MessagingService implements OnModuleInit, OnModuleDestroy {
         this.channel = await this.connection.createChannel();
       } else {
         this.logger.log('Using mock message broker (USE_REAL_MESSAGE_BROKER=false)');
-        // Mock the connection and channel
-        // This prevents errors when no RabbitMQ is available
       }
       
-      // Setup error handling for real connections
       if (this.connection) {
         this.connection.on('error', (err: Error) => {
           this.isConnected = false;
@@ -103,12 +97,10 @@ export class MessagingService implements OnModuleInit, OnModuleDestroy {
     } catch (error: any) {
       this.isConnected = false;
       this.logger.error(`Failed to connect to RabbitMQ: ${error.message}`, error.stack || '');
-      // Attempt to reconnect after a delay
       setTimeout(() => this.connect(), 5000);
     }
   }
 
-  // Publish a message to the exchange with a routing key
   async publishEvent<T>(routingKey: string, data: T): Promise<boolean> {
     try {
       if (!this.isConnected) {
@@ -116,7 +108,6 @@ export class MessagingService implements OnModuleInit, OnModuleDestroy {
         await this.connect();
       }
       
-      // If using a mock connection, just log the event but consider it successful
       if (!this.channel) {
         this.logger.log(`[MOCK] Published message to ${routingKey}: ${JSON.stringify(data)}`);
         return true;
@@ -132,15 +123,11 @@ export class MessagingService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(`Published message to ${routingKey}: ${JSON.stringify(data)}`);
       return success;
     } catch (error: any) {
-      this.logger.error(
-        `Failed to publish message to ${routingKey}: ${error.message}`,
-        error.stack || '',
-      );
+      this.logger.error(`Failed to publish message to ${routingKey}: ${error.message}`, error.stack || '');
       return false;
     }
   }
 
-  // Subscribe to a queue for a specific routing key pattern
   async subscribeToQueue(
     queueName: string, 
     routingPattern: string,
@@ -152,19 +139,15 @@ export class MessagingService implements OnModuleInit, OnModuleDestroy {
         await this.connect();
       }
       
-      // If using a mock connection, just log the subscription but don't try to set up anything
       if (!this.channel) {
         this.logger.log(`[MOCK] Subscribed to queue ${queueName} with routing pattern ${routingPattern}`);
         return;
       }
       
-      // Assert queue exists
       await this.channel.assertQueue(queueName, { durable: true });
       
-      // Bind queue to exchange with routing pattern
       await this.channel.bindQueue(queueName, this.exchangeName, routingPattern);
       
-      // Consume messages
       this.channel.consume(queueName, async (msg: amqplib.ConsumeMessage | null) => {
         if (msg) {
           try {
@@ -173,14 +156,9 @@ export class MessagingService implements OnModuleInit, OnModuleDestroy {
             
             await onMessage(content);
             
-            // Acknowledge the message
             this.channel.ack(msg);
           } catch (error: any) {
-            this.logger.error(
-              `Error processing message from ${queueName}: ${error.message}`,
-              error.stack || '',
-            );
-            // Reject the message and requeue
+            this.logger.error(`Error processing message from ${queueName}: ${error.message}`, error.stack || '');
             this.channel.nack(msg, false, true);
           }
         }
@@ -188,10 +166,7 @@ export class MessagingService implements OnModuleInit, OnModuleDestroy {
       
       this.logger.log(`Subscribed to queue ${queueName} with routing pattern ${routingPattern}`);
     } catch (error: any) {
-      this.logger.error(
-        `Failed to subscribe to queue ${queueName}: ${error.message}`,
-        error.stack || '',
-      );
+      this.logger.error(`Failed to subscribe to queue ${queueName}: ${error.message}`, error.stack || '');
     }
   }
 }

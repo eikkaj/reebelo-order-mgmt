@@ -18,7 +18,7 @@ export class InventoryService {
     this.logger.setContext('InventoryService');
     this.baseUrl = this.configService.inventoryServiceUrl;
     
-    // Pre-populate mock inventory for demo purposes
+    // mocking for now...
     this.setupMockInventory();
   }
 

@@ -194,6 +194,7 @@ export class InventoryService {
         await new Promise(resolve => setTimeout(resolve, 50));
         
         const currentInventory = this.inventoryCache.get(productId) || 0;
+        this.logger.log(`Releasing ${quantity} units of product ID: ${productId} (mocked) - current inventory: ${currentInventory}`);
         this.inventoryCache.set(productId, currentInventory + quantity);
         
         return true;

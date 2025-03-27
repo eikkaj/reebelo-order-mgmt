@@ -240,21 +240,17 @@ export class OrdersService {
       return false;
     }
 
-    // If order is canceled, release inventory
-    if (order.status === OrderStatus.CANCELED) {
-      for (const item of order.items) {
-        await this.inventoryService.releaseInventory(item.productId, item.quantity);
-        
-        // Publish inventory release event
-        await this.publishInventoryEvent(QueueEvents.INVENTORY_RELEASED, item.productId, item.quantity);
-      }
-    }
-
     const result = await this.orderRepository.delete(id);
     
     if (result) {
       const updatedOrder = { ...order!, status: OrderStatus.CANCELED, updatedAt: new Date()};
       await this.publishOrderEvent(OrderStatus.CANCELED, updatedOrder);
+
+      // Order was canceled, release inventory
+      for (const item of order.items) {
+        await this.inventoryService.releaseInventory(item.productId, item.quantity);
+        await this.publishInventoryEvent(QueueEvents.INVENTORY_RELEASED, item.productId, item.quantity);
+      }
     }
     
     return result;
